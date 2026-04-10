@@ -1,0 +1,76 @@
+# private/Dockerfile.craft
+#
+# Craft image -- extends stock Archon with:
+#   - Python 3 + venv for strategy-workspace MCP clients and memory system
+#   - OAuth directory structure (Gmail, Drive, Calendar)
+#   - Global Claude config cloned from private repo (imagicrafter/global-claude-config)
+#   - npx -> bunx symlink for MCP servers
+#   - gh auth credential helper
+#
+# Build:
+#   1. Build stock:  docker build -t archon .
+#   2. Build craft:  docker build -t archon-craft -f private/Dockerfile.craft .
+#   Or use:          docker compose -f private/docker-compose.craft.yml up --build
+
+FROM archon
+
+USER root
+
+# Python 3 + venv for strategy-workspace MCP clients (gmail, drive, fireflies) and memory system
+# Note: python3-pip is NOT needed -- venv handles pip internally
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-venv ntpsec-ntpdate \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY private/strategy-requirements.txt /tmp/strategy-requirements.txt
+RUN python3 -m venv /opt/strategy-venv \
+    && /opt/strategy-venv/bin/pip install --no-cache-dir -r /tmp/strategy-requirements.txt \
+    && rm /tmp/strategy-requirements.txt
+
+# OAuth token directories (Gmail, Google Drive, Google Calendar -- mounted as volumes at runtime)
+RUN mkdir -p /home/appuser/.gmail-mcp \
+    /home/appuser/.config/google-drive-mcp \
+    /home/appuser/.config/google-calendar-mcp \
+    && chown -R appuser:appuser \
+        /home/appuser/.gmail-mcp \
+        /home/appuser/.config/google-drive-mcp \
+        /home/appuser/.config/google-calendar-mcp
+
+# Clone global Claude Code configuration (commands, agents, rules, hooks, skills)
+# Uses BuildKit secret to avoid persisting GH_TOKEN in image layers
+RUN --mount=type=secret,id=gh_token \
+    git clone https://$(cat /run/secrets/gh_token)@github.com/imagicrafter/global-claude-config.git /home/appuser/.claude \
+    && chown -R appuser:appuser /home/appuser/.claude
+
+# Symlink bunx as npx so MCP servers (Gmail, Drive, Fireflies) launch correctly
+RUN ln -sf $(which bunx) /usr/local/bin/npx
+
+# Symlink claude binary into PATH so Archon's Node.js claude-agent-sdk can spawn it
+# (strategy-venv installs claude_agent_sdk which bundles the claude CLI binary)
+# Use find for Python-version-agnostic resolution
+RUN ln -sf $(find /opt/strategy-venv -name claude -path '*/claude_agent_sdk/_bundled/*' | head -1) /usr/local/bin/claude
+
+# Fix permissions on directories modified by this Dockerfile only
+RUN chown -R appuser:appuser /opt/strategy-venv /home/appuser/.claude \
+    /home/appuser/.gmail-mcp /home/appuser/.config/google-drive-mcp \
+    /home/appuser/.config/google-calendar-mcp
+
+# Run global config setup as appuser (install hook dependencies, validate structure)
+# Allow macOS-specific feature skips but fail on critical errors
+USER appuser
+WORKDIR /home/appuser/.claude
+RUN bash setup.sh 2>&1 | tee /tmp/setup.log; \
+    if grep -qi "critical\|fatal\|permission denied" /tmp/setup.log; then exit 1; fi
+WORKDIR /app
+
+# Trust global Claude config directory
+RUN git config --global --add safe.directory '/home/appuser/.claude'
+
+# Configure gh CLI as git credential helper for GitHub HTTPS clones
+RUN GH_TOKEN= gh auth setup-git 2>/dev/null \
+    || git config --global credential.https://github.com.helper '!/usr/local/bin/gh auth git-credential'
+
+# CRITICAL: Do NOT end with USER appuser. The stock image's docker-entrypoint.sh
+# runs as root, fixes /.archon volume permissions via chown, then drops to appuser
+# via gosu. Ending with USER appuser would bypass this permission fixing.
+USER root

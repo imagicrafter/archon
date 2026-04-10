@@ -1,0 +1,122 @@
+# private/docker-compose.craft.yml
+#
+# Private deployment: Craft (Second Brain) + Forge (Agentic Coding Executor)
+#
+# Two-image build chain (simplified from three):
+#   1. archon  -> stock Archon image (multi-stage: deps + web build + production)
+#   2. craft   -> archon + Python/OAuth/claude-config layers
+#
+# Forge runs the stock archon image directly -- no custom Dockerfile needed.
+# The stock multi-stage build already includes the web UI.
+#
+# Build and run:
+#   docker compose -f private/docker-compose.craft.yml build
+#   docker compose -f private/docker-compose.craft.yml up -d --force-recreate
+
+# Project name must match the old compose setup so existing named volumes
+# (remote-coding-agent_craft_data, etc.) are reused without data migration.
+name: remote-coding-agent
+
+services:
+  # -- Craft: Second Brain & Business Assistant --------------------------------
+  # Runs strategy-workspace as a constant active codebase. Port 3000.
+  craft:
+    container_name: craft
+    build:
+      context: ..
+      dockerfile: private/Dockerfile.craft
+      secrets:
+        - gh_token
+    image: archon-craft
+    env_file: ../.env.craft
+    environment:
+      ARCHON_DOCKER: "true"
+      PORT: "3000"
+      TZ: "America/Chicago"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - craft_data:/.archon
+      - claude-config:/home/appuser/.claude
+      - oauth-tokens:/home/appuser/.gmail-mcp
+      - drive-tokens:/home/appuser/.config/google-drive-mcp
+      - calendar-tokens:/home/appuser/.config/google-calendar-mcp
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # -- Forge: Agentic Coding Executor -----------------------------------------
+  # Stock Archon image with built-in web UI (multi-stage build). Port 3001.
+  # No custom Dockerfile needed -- the stock image already includes everything.
+  forge:
+    container_name: forge
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: archon
+    env_file: ../.env.forge
+    environment:
+      ARCHON_DOCKER: "true"
+      PORT: "3001"
+      TZ: "America/Chicago"
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - forge_data:/.archon
+      - claude-config:/home/appuser/.claude
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # -- PostgreSQL (optional) ---------------------------------------------------
+  postgres:
+    image: postgres:18
+    profiles: ["with-db"]
+    environment:
+      POSTGRES_DB: remote_coding_agent
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ../migrations/000_combined.sql:/docker-entrypoint-initdb.d/000_combined.sql:ro
+      - ../migrations:/migrations:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+secrets:
+  gh_token:
+    environment: GH_TOKEN
+
+volumes:
+  craft_data:
+  forge_data:
+  claude-config:
+  oauth-tokens:
+  drive-tokens:
+  calendar-tokens:
+  postgres_data:

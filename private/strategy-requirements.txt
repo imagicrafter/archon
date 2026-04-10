@@ -1,0 +1,11 @@
+mcp>=1.26,<2.0
+fastmcp>=2.14,<3.0
+zep-cloud>=3.16,<4.0
+flask>=3.1,<4.0
+yfinance>=1.2,<2.0
+python-dotenv>=1.0.0
+claude-agent-sdk>=0.1.29
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+supabase>=2.0,<3.0
