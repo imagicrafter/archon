@@ -310,7 +310,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Send a message to a conversation */
+    /**
+     * Send a message (JSON or multipart with file uploads)
+     * @description Accepts `application/json` with `{ message: string }` or `multipart/form-data` with a `message` field and optional file attachments (max 5 files, 10 MB each).
+     */
     post: {
       parameters: {
         query?: never;
@@ -320,11 +323,7 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody: {
-        content: {
-          'application/json': components['schemas']['SendMessageBody'];
-        };
-      };
+      requestBody?: never;
       responses: {
         /** @description Accepted */
         200: {
@@ -539,6 +538,136 @@ export interface paths {
         };
         /** @description Server error */
         500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/codebases/{id}/env': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List env vars for a codebase */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Env vars for codebase */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['CodebaseEnvVarsResponse'];
+          };
+        };
+        /** @description Codebase not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+      };
+    };
+    /** Set (upsert) an env var for a codebase */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['SetEnvVarBody'];
+        };
+      };
+      responses: {
+        /** @description Env var set */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['EnvVarMutationResponse'];
+          };
+        };
+        /** @description Codebase not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/codebases/{id}/env/{key}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete an env var from a codebase */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+          key: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Env var deleted */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['EnvVarMutationResponse'];
+          };
+        };
+        /** @description Codebase not found */
+        404: {
           headers: {
             [name: string]: unknown;
           };
@@ -787,6 +916,379 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workflows/runs/{runId}/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resume a failed workflow run (re-run auto-resumes from completed nodes) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resumed */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['WorkflowRunActionResponse'];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workflows/runs/{runId}/abandon': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Abandon a workflow run (mark as failed) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Abandoned */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['WorkflowRunActionResponse'];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workflows/runs/{runId}/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve a paused workflow run */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['ApproveWorkflowRunBody'];
+        };
+      };
+      responses: {
+        /** @description Approved */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['WorkflowRunActionResponse'];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workflows/runs/{runId}/reject': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reject a paused workflow run */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['RejectWorkflowRunBody'];
+        };
+      };
+      responses: {
+        /** @description Rejected */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['WorkflowRunActionResponse'];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workflows/runs/{runId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get workflow run details with events */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Workflow run detail */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['WorkflowRunDetail'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete a workflow run and its events */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['WorkflowRunActionResponse'];
+          };
+        };
+        /** @description Bad request */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+        /** @description Server error */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Error'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workflows/runs': {
     parameters: {
       query?: never;
@@ -863,62 +1365,6 @@ export interface paths {
           };
           content: {
             'application/json': components['schemas']['WorkflowRunByWorkerResponse'];
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-        /** @description Server error */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Error'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/workflows/runs/{runId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get workflow run details with events */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          runId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Workflow run detail */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['WorkflowRunDetail'];
           };
         };
         /** @description Not found */
@@ -1330,6 +1776,42 @@ export interface paths {
     };
     trace?: never;
   };
+  '/api/providers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List registered AI providers */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List of registered providers */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ProviderListResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/codebases/{id}/environments': {
     parameters: {
       query?: never;
@@ -1422,6 +1904,42 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/update-check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Check for available updates */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Update check result */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['UpdateCheckResponse'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1474,9 +1992,6 @@ export interface components {
       accepted: boolean;
       status: string;
     };
-    SendMessageBody: {
-      message: string;
-    };
     CodebaseCommand: {
       path: string;
       description: string;
@@ -1501,6 +2016,16 @@ export interface components {
     DeleteCodebaseResponse: {
       success: boolean;
     };
+    CodebaseEnvVarsResponse: {
+      keys: string[];
+    };
+    EnvVarMutationResponse: {
+      success: boolean;
+    };
+    SetEnvVarBody: {
+      key: string;
+      value: string;
+    };
     DagNode: {
       id: string;
       depends_on?: string[];
@@ -1508,8 +2033,7 @@ export interface components {
       /** @enum {string} */
       trigger_rule?: 'all_success' | 'one_success' | 'none_failed_min_one_success' | 'all_done';
       model?: string;
-      /** @enum {string} */
-      provider?: 'claude' | 'codex';
+      provider?: string;
       /** @enum {string} */
       context?: 'fresh' | 'shared';
       output_format?: {
@@ -1675,6 +2199,66 @@ export interface components {
       };
       mcp?: string;
       skills?: string[];
+      agents?: {
+        [key: string]: {
+          description: string;
+          prompt: string;
+          model?: string;
+          tools?: string[];
+          disallowedTools?: string[];
+          skills?: string[];
+          maxTurns?: number;
+        };
+      };
+      /** @enum {string} */
+      effort?: 'low' | 'medium' | 'high' | 'max';
+      thinking?:
+        | {
+            /** @enum {string} */
+            type: 'adaptive';
+          }
+        | {
+            /** @enum {string} */
+            type: 'enabled';
+            budgetTokens?: number;
+          }
+        | {
+            /** @enum {string} */
+            type: 'disabled';
+          };
+      maxBudgetUsd?: number;
+      systemPrompt?: string;
+      fallbackModel?: string;
+      betas?: string[];
+      sandbox?: {
+        enabled?: boolean;
+        autoAllowBashIfSandboxed?: boolean;
+        allowUnsandboxedCommands?: boolean;
+        network?: {
+          allowedDomains?: string[];
+          allowManagedDomainsOnly?: boolean;
+          allowUnixSockets?: string[];
+          allowAllUnixSockets?: boolean;
+          allowLocalBinding?: boolean;
+          httpProxyPort?: number;
+          socksProxyPort?: number;
+        };
+        filesystem?: {
+          allowWrite?: string[];
+          denyWrite?: string[];
+          denyRead?: string[];
+        };
+        ignoreViolations?: {
+          [key: string]: string[];
+        };
+        enableWeakerNestedSandbox?: boolean;
+        enableWeakerNetworkIsolation?: boolean;
+        excludedCommands?: string[];
+        ripgrep?: {
+          command: string;
+          args?: string[];
+        };
+      };
       command?: string;
       prompt?: string;
       bash?: string;
@@ -1685,24 +2269,86 @@ export interface components {
         /** @default false */
         fresh_context: boolean;
         until_bash?: string;
+        interactive?: boolean;
+        gate_message?: string;
       };
+      approval?: {
+        message: string;
+        capture_response?: boolean;
+        on_reject?: {
+          prompt: string;
+          max_attempts?: number;
+        };
+      };
+      cancel?: string;
+      script?: string;
+      /** @enum {string} */
+      runtime?: 'bun' | 'uv';
+      deps?: string[];
       timeout?: number;
     };
     WorkflowDefinition: {
       name: string;
       description: string;
-      /** @enum {string} */
-      provider?: 'claude' | 'codex';
+      provider?: string;
       model?: string;
       /** @enum {string} */
       modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
       /** @enum {string} */
       webSearchMode?: 'disabled' | 'cached' | 'live';
       additionalDirectories?: string[];
+      interactive?: boolean;
+      /** @enum {string} */
+      effort?: 'low' | 'medium' | 'high' | 'max';
+      thinking?:
+        | {
+            /** @enum {string} */
+            type: 'adaptive';
+          }
+        | {
+            /** @enum {string} */
+            type: 'enabled';
+            budgetTokens?: number;
+          }
+        | {
+            /** @enum {string} */
+            type: 'disabled';
+          };
+      fallbackModel?: string;
+      betas?: string[];
+      sandbox?: {
+        enabled?: boolean;
+        autoAllowBashIfSandboxed?: boolean;
+        allowUnsandboxedCommands?: boolean;
+        network?: {
+          allowedDomains?: string[];
+          allowManagedDomainsOnly?: boolean;
+          allowUnixSockets?: string[];
+          allowAllUnixSockets?: boolean;
+          allowLocalBinding?: boolean;
+          httpProxyPort?: number;
+          socksProxyPort?: number;
+        };
+        filesystem?: {
+          allowWrite?: string[];
+          denyWrite?: string[];
+          denyRead?: string[];
+        };
+        ignoreViolations?: {
+          [key: string]: string[];
+        };
+        enableWeakerNestedSandbox?: boolean;
+        enableWeakerNetworkIsolation?: boolean;
+        excludedCommands?: string[];
+        ripgrep?: {
+          command: string;
+          args?: string[];
+        };
+      };
       nodes: components['schemas']['DagNode'][];
     };
     /** @enum {string} */
-    WorkflowSource: 'project' | 'bundled';
+    WorkflowSource: 'project' | 'bundled' | 'global';
     WorkflowListEntry: {
       workflow: components['schemas']['WorkflowDefinition'];
       source: components['schemas']['WorkflowSource'];
@@ -1762,11 +2408,22 @@ export interface components {
         failed: number;
         cancelled: number;
         pending: number;
+        paused: number;
       };
     };
     CancelWorkflowRunResponse: {
       success: boolean;
       message: string;
+    };
+    WorkflowRunActionResponse: {
+      success: boolean;
+      message: string;
+    };
+    ApproveWorkflowRunBody: {
+      comment?: string;
+    };
+    RejectWorkflowRunBody: {
+      reason?: string;
     };
     WorkflowRunListResponse: {
       runs: components['schemas']['WorkflowRun'][];
@@ -1823,21 +2480,14 @@ export interface components {
     CommandListResponse: {
       commands: components['schemas']['CommandEntry'][];
     };
+    ProviderDefaults: {
+      [key: string]: unknown;
+    };
     SafeConfig: {
       botName: string;
-      /** @enum {string} */
-      assistant: 'claude' | 'codex';
+      assistant: string;
       assistants: {
-        claude: {
-          model?: string;
-        };
-        codex: {
-          model?: string;
-          /** @enum {string} */
-          modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
-          /** @enum {string} */
-          webSearchMode?: 'disabled' | 'cached' | 'live';
-        };
+        [key: string]: components['schemas']['ProviderDefaults'];
       };
       streaming: {
         /** @enum {string} */
@@ -1846,8 +2496,6 @@ export interface components {
         discord: 'stream' | 'batch';
         /** @enum {string} */
         slack: 'stream' | 'batch';
-        /** @enum {string} */
-        github: 'stream' | 'batch';
       };
       concurrency: {
         maxConversations: number;
@@ -1863,18 +2511,33 @@ export interface components {
       database: string;
     };
     UpdateAssistantConfigBody: {
-      /** @enum {string} */
-      assistant?: 'claude' | 'codex';
-      claude?: {
-        model: string;
+      assistant?: string;
+      assistants?: {
+        [key: string]: components['schemas']['ProviderDefaults'];
       };
-      codex?: {
-        model: string;
-        /** @enum {string} */
-        modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
-        /** @enum {string} */
-        webSearchMode?: 'disabled' | 'cached' | 'live';
-      };
+    };
+    ProviderCapabilities: {
+      sessionResume: boolean;
+      mcp: boolean;
+      hooks: boolean;
+      skills: boolean;
+      toolRestrictions: boolean;
+      structuredOutput: boolean;
+      envInjection: boolean;
+      costControl: boolean;
+      effortControl: boolean;
+      thinkingControl: boolean;
+      fallbackModel: boolean;
+      sandbox: boolean;
+    };
+    ProviderInfo: {
+      id: string;
+      displayName: string;
+      capabilities: components['schemas']['ProviderCapabilities'];
+      builtIn: boolean;
+    };
+    ProviderListResponse: {
+      providers: components['schemas']['ProviderInfo'][];
     };
     IsolationEnvironment: {
       id: string;
@@ -1896,6 +2559,14 @@ export interface components {
         [key: string]: unknown;
       };
       runningWorkflows: number;
+      version?: string;
+      is_docker: boolean;
+    };
+    UpdateCheckResponse: {
+      updateAvailable: boolean;
+      currentVersion: string;
+      latestVersion: string;
+      releaseUrl: string;
     };
   };
   responses: never;

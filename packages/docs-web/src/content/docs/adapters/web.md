@@ -81,7 +81,7 @@ Accessible via the `/dashboard` route, the Command Center shows all workflow run
 
 ### Settings
 
-The `/settings` page lets you configure assistant defaults (model, provider) without editing YAML files.
+The `/settings` page lets you configure assistant defaults (model, provider) without editing YAML files. It also includes a **Projects** section for registering and managing codebases.
 
 ## Chat Interface
 
@@ -140,6 +140,18 @@ While a workflow runs, a progress card appears in the conversation showing:
 
 For paused workflows (approval gates), the progress card shows **Approve** and **Reject** buttons so you can control the workflow directly from the chat.
 
+### Workflow Result Card
+
+When a workflow reaches a terminal state (completed, failed, or cancelled), the progress card is replaced by a result card in the conversation. The result card shows:
+
+- **Status icon** -- Visual indicator for completed, failed, or cancelled
+- **Header** -- "Workflow complete", "Workflow failed", or "Workflow cancelled" depending on outcome
+- **Node count** -- How many nodes completed out of the total nodes that reached a terminal state (e.g., `3/4 nodes`)
+- **Duration** -- Total elapsed time for the run
+- **Artifacts** -- Any files or outputs produced by the workflow, with direct links
+
+Click the arrow button in the result card header to open the full execution detail page.
+
 ### Execution Detail Page
 
 Click on a workflow run (from the dashboard or progress card) to open the execution detail page at `/workflows/runs/:runId`. This shows:
@@ -160,6 +172,7 @@ The Workflow Builder at `/workflows/builder` provides a visual editor for creati
 - **Command picker** -- Browse available commands when configuring command nodes
 - **Validation panel** -- Real-time validation feedback as you build
 - **Undo/redo** -- Full undo/redo stack with keyboard shortcuts
+- **Delete node** -- Remove a selected node with `Delete` or `Backspace`, the Delete button in the inspector header, or the right-click context menu on any node
 - **Save** -- Saves the workflow YAML to your project's `.archon/workflows/` directory
 
 You can also browse existing workflows on the `/workflows` page and open any of them in the builder to edit.
@@ -191,10 +204,11 @@ A separate dashboard SSE stream at `/api/stream/__dashboard__` multiplexes workf
 
 ### Registering a Project
 
-From the Web UI, you can register codebases in two ways:
+From the Web UI, you can register codebases in three ways:
 
-1. **Clone from URL** -- Use the `/clone <url>` command in chat, or use the API to POST to `/api/codebases` with a `url` field
-2. **Register a local path** -- POST to `/api/codebases` with a `path` field pointing to an existing git repository
+1. **Add Project input** -- Click **+** in the sidebar or go to **Settings → Projects** and enter a GitHub URL or local path. Inputs starting with `https://`, `ssh://`, `git@`, or `git://` are treated as remote URLs (cloned); everything else is treated as a local path (registered in place).
+2. **Clone from URL via chat** -- Use the `/clone <url>` command in chat, or use the API to POST to `/api/codebases` with a `url` field
+3. **Register a local path via API** -- POST to `/api/codebases` with a `path` field pointing to an existing git repository
 
 Registered codebases appear in the sidebar's project selector.
 

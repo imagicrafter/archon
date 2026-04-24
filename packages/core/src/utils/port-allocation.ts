@@ -22,7 +22,7 @@ function getLog(): ReturnType<typeof createLogger> {
  */
 export function calculatePortOffset(path: string): number {
   const hash = createHash('md5').update(path).digest();
-  // 100-999 range: Offset starts at 100 to avoid default port 3000, results in ports 3100-3999
+  // 100-999 range: offset starts at 100; produces ports 3190-4089 when added to basePort (3090)
   return (hash.readUInt16BE(0) % 900) + 100;
 }
 
@@ -30,7 +30,7 @@ export function calculatePortOffset(path: string): number {
  * Get the port for the Hono server
  * - If PORT env var is set: use it (explicit override, validated)
  * - If running in worktree: auto-allocate deterministic port based on path hash
- * - Otherwise: use default 3000
+ * - Otherwise: use default 3090 (matches the Vite proxy fallback in packages/web/vite.config.ts)
  *
  * Note: Exits process with code 1 if PORT env var is set but invalid (not 1-65535)
  */

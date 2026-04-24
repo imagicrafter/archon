@@ -50,7 +50,7 @@ archon workflow run plan --cwd /path/to/repo --branch feature-auth "Add OAuth su
 archon workflow run assist --cwd /path/to/repo --no-worktree "Quick question"
 ```
 
-**Note:** Workflow and isolation commands require running from within a git repository. Running from subdirectories automatically resolves to the repo root. The `version`, `help`, `chat`, and `setup` commands work anywhere.
+**Note:** Workflow and isolation commands require running from within a git repository. Running from subdirectories automatically resolves to the repo root. The `version`, `help`, `chat`, `setup`, and `serve` commands work anywhere.
 
 ## Commands
 
@@ -67,15 +67,22 @@ archon chat "What does the orchestrator do?"
 Interactive setup wizard for credentials and configuration.
 
 ```bash
-archon setup
-archon setup --spawn  # Open in a new terminal window
+archon setup                      # writes ~/.archon/.env (home scope, default)
+archon setup --scope project      # writes <cwd>/.archon/.env instead
+archon setup --force              # overwrite instead of merging (backup still written)
+archon setup --spawn              # open in a new terminal window
 ```
 
 **Flags:**
 
 | Flag | Effect |
 |------|--------|
-| `--spawn` | Open setup wizard in a new terminal window |
+| `--scope home` | Write to `~/.archon/.env` (default). Applies to every project. |
+| `--scope project` | Write to `<cwd>/.archon/.env`. Overrides user scope for this repo only. |
+| `--force` | Overwrite the target file wholesale instead of merging. A timestamped backup is still written. |
+| `--spawn` | Open setup wizard in a new terminal window. |
+
+**Write safety**: `archon setup` never writes to `<cwd>/.env` — that file belongs to you. The wizard always targets one archon-owned file chosen by `--scope`, merges into existing content (so user-added keys survive), and writes a timestamped backup before every rewrite (e.g. `~/.archon/.env.archon-backup-2026-04-20T09-28-11-000Z`).
 
 ### `workflow list`
 
@@ -88,7 +95,7 @@ archon workflow list --cwd /path/to/repo
 archon workflow list --cwd /path/to/repo --json
 ```
 
-Discovers workflows from `.archon/workflows/` (recursive), `~/.archon/.archon/workflows/` (global), and bundled defaults. See [Global Workflows](/guides/global-workflows/).
+Discovers workflows from `.archon/workflows/` (recursive), `~/.archon/workflows/` (global, home-scoped), and bundled defaults. See [Global Workflows](/guides/global-workflows/).
 
 **Flags:**
 
@@ -122,7 +129,6 @@ Progress events (node start/complete/fail/skip, approval gates) are written to s
 | `--from <branch>`, `--from-branch <branch>` | Override base branch (start-point for worktree) |
 | `--no-worktree` | Opt out of isolation -- run directly in live checkout |
 | `--resume` | Resume from last failed run at the working path (skips completed nodes) |
-| `--allow-env-keys` | Grant env-leak-gate consent during auto-registration (bypasses the gate for this codebase). Audit-logged as `env_leak_consent_granted` with `actor: 'user-cli'`. See [security.md](/reference/security/#env-leak-gate-target-repo-env-keys). |
 | `--quiet`, `-q` | Suppress all progress output to stderr |
 | `--verbose`, `-v` | Also show tool-level events (tool name and duration) |
 
@@ -172,7 +178,7 @@ archon workflow resume <run-id>
 
 ### `workflow abandon`
 
-Discard a workflow run (marks it as failed). Use this to unblock a worktree when you don't want to resume.
+Discard a workflow run (marks it as `cancelled`). Use this to unblock a worktree when you don't want to resume — the path lock is released immediately so a new workflow can start.
 
 ```bash
 archon workflow abandon <run-id>
@@ -303,6 +309,32 @@ archon complete feature-auth --force  # bypass uncommitted-changes check
 
 Use this after a PR is merged and you no longer need the worktree or branches. Accepts multiple branch names in one call.
 
+### `serve`
+
+Start the web UI server. On first run, downloads a pre-built web UI tarball from the matching GitHub release, verifies the SHA-256 checksum, and extracts it. Subsequent runs use the cached copy.
+
+**Binary installs only** — in development, use `bun run dev` instead.
+
+```bash
+# Start web UI server (downloads on first run)
+archon serve
+
+# Override the default port
+archon serve --port 4000
+
+# Download the web UI without starting the server
+archon serve --download-only
+```
+
+**Flags:**
+
+| Flag | Effect |
+|------|--------|
+| `--port <port>` | Override server port (default: 3090, range: 1–65535) |
+| `--download-only` | Download and cache the web UI, then exit without starting the server |
+
+The cached web UI is stored at `~/.archon/web-dist/<version>/`. Each version is cached independently, so upgrading the binary automatically downloads the matching web UI.
+
 ### `version`
 
 Show version, build type, and database info.
@@ -336,12 +368,15 @@ When using `--branch`, workflows run inside the worktree directory.
 
 ## Environment
 
-The CLI loads environment variables exclusively from `~/.archon/.env`. It does **not** load `.env` from the current working directory. This prevents conflicts when running Archon from target projects that have their own database configurations.
+At startup, the CLI strips all Bun-auto-loaded CWD `.env` keys and nested Claude Code session markers from `process.env`, then loads two archon-owned env files with `override: true`. Keys in archon-owned files pass through to AI subprocesses — no allowlist filtering.
 
 On startup, the CLI:
-1. Deletes any `DATABASE_URL` that Bun may have auto-loaded from the target repo's `.env`
-2. Loads `~/.archon/.env` with `override: true`
-3. Auto-enables global Claude auth if no explicit tokens are set
+1. Strips `<cwd>/.env*` keys + `CLAUDECODE` markers from `process.env` (via `stripCwdEnv`). Emits `[archon] stripped N keys from <cwd> (...)` when N > 0.
+2. Loads `~/.archon/.env` (user scope). Emits `[archon] loaded N keys from ~/.archon/.env` when N > 0.
+3. Loads `<cwd>/.archon/.env` (project scope, overrides user scope). Emits `[archon] loaded N keys from <path> (repo scope, overrides user scope)` when N > 0.
+4. Auto-enables global Claude auth if no explicit tokens are set.
+
+`<cwd>/.env` is never loaded — it belongs to the target project. See [Configuration Reference: `.env` File Locations](/reference/configuration/#env-file-locations) for the full three-path model.
 
 ## Database
 

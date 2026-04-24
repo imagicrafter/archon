@@ -80,6 +80,10 @@ mock.module('@archon/isolation', () => ({
   IsolationHints: {},
 }));
 
+// Mock global fetch to prevent real HTTP calls (gitlab.example.com hangs on CI Linux)
+const mockFetch = mock(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })));
+globalThis.fetch = mockFetch as typeof globalThis.fetch;
+
 // Now import the adapter (after all mocks)
 const { GitLabAdapter } = await import('./adapter');
 const { ConversationLockManager } = await import('@archon/core');
@@ -158,6 +162,7 @@ describe('GitLabAdapter', () => {
   beforeEach(() => {
     mockHandleMessage.mockClear();
     mockOnConversationClosed.mockClear();
+    mockFetch.mockClear();
     // Reset env
     delete process.env.GITLAB_ALLOWED_USERS;
   });

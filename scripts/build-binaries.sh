@@ -21,6 +21,12 @@ OUTFILE="${OUTFILE:-}"
 
 echo "Building Archon CLI v${VERSION} (commit: ${GIT_COMMIT})"
 
+# Regenerate bundled defaults from .archon/{commands,workflows}/defaults/ so the
+# compiled binary always embeds the current on-disk contents. CI also runs
+# `bun run check:bundled` to catch committed drift.
+echo "Regenerating bundled defaults..."
+bun run scripts/generate-bundled-defaults.ts
+
 # Update build-time constants in source before compiling.
 # The file is restored via an EXIT trap so the dev tree is never left dirty,
 # even if `bun build --compile` fails mid-way. See GitHub issue #979.
@@ -69,17 +75,13 @@ for target_pair in "${TARGETS[@]}"; do
   IFS=':' read -r target outfile <<< "$target_pair"
   echo "Building $target → $outfile"
 
-  # --bytecode excluded for Windows cross-compile (inconsistent Bun support)
-  BYTECODE_FLAG=""
-  if [[ "$target" != *windows* ]]; then
-    BYTECODE_FLAG="--bytecode"
-  fi
-
-  # Always --minify to match release parity
+  # --bytecode disabled: Bun 1.3.11 produces broken bytecode for our module graph
+  # (likely triggered by @mariozechner/pi-coding-agent's CJS/ESM interop shape) —
+  # "TypeError: Expected CommonJS module to have a function wrapper" at runtime.
+  # Always --minify to match release parity.
   bun build \
     --compile \
     --minify \
-    $BYTECODE_FLAG \
     --target="$target" \
     --outfile="$outfile" \
     packages/cli/src/cli.ts
