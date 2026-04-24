@@ -37,16 +37,21 @@ export {
   approvalNodeSchema,
   approvalOnRejectSchema,
   cancelNodeSchema,
+  scriptNodeSchema,
   dagNodeSchema,
   isBashNode,
   isLoopNode,
   isApprovalNode,
   isCancelNode,
+  isScriptNode,
   isTriggerRule,
   BASH_NODE_AI_FIELDS,
+  SCRIPT_NODE_AI_FIELDS,
+  LOOP_NODE_AI_FIELDS,
   effortLevelSchema,
   thinkingConfigSchema,
   sandboxSettingsSchema,
+  agentDefinitionSchema,
 } from './dag-node';
 export type {
   TriggerRule,
@@ -58,10 +63,12 @@ export type {
   ApprovalNode,
   ApprovalOnReject,
   CancelNode,
+  ScriptNode,
   DagNode,
   EffortLevel,
   ThinkingConfig,
   SandboxSettings,
+  AgentDefinition,
 } from './dag-node';
 
 // Workflow definition

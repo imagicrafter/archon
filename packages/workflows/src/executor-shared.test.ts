@@ -22,6 +22,9 @@ import {
   substituteWorkflowVariables,
   buildPromptWithContext,
   detectCreditExhaustion,
+  detectCompletionSignal,
+  stripCompletionTags,
+  isInlineScript,
 } from './executor-shared';
 
 describe('substituteWorkflowVariables', () => {
@@ -166,6 +169,50 @@ describe('substituteWorkflowVariables', () => {
     expect(prompt).toBe('Issue: context-data. External: context-data');
   });
 
+  it('does not treat context variables as prefixes of longer identifiers', () => {
+    const { prompt, contextSubstituted } = substituteWorkflowVariables(
+      'Context: $CONTEXT. File: $CONTEXT_FILE. External path: $EXTERNAL_CONTEXT_PATH. IssueId: $ISSUE_CONTEXT_ID',
+      'run-1',
+      'msg',
+      '/tmp',
+      'main',
+      'docs/',
+      'context-data'
+    );
+    expect(prompt).toBe(
+      'Context: context-data. File: $CONTEXT_FILE. External path: $EXTERNAL_CONTEXT_PATH. IssueId: $ISSUE_CONTEXT_ID'
+    );
+    expect(contextSubstituted).toBe(true);
+  });
+
+  it('does not substitute $ISSUE_CONTEXT when followed by identifier characters', () => {
+    const { prompt } = substituteWorkflowVariables(
+      'Issue: $ISSUE_CONTEXT. ID: $ISSUE_CONTEXT_ID. Type: $ISSUE_CONTEXT_TYPE',
+      'run-1',
+      'msg',
+      '/tmp',
+      'main',
+      'docs/',
+      'context-data'
+    );
+    expect(prompt).toBe('Issue: context-data. ID: $ISSUE_CONTEXT_ID. Type: $ISSUE_CONTEXT_TYPE');
+  });
+
+  it('does not set contextSubstituted when only suffix-extended context vars are present', () => {
+    const { prompt, contextSubstituted } = substituteWorkflowVariables(
+      'Path: $CONTEXT_FILE',
+      'run-1',
+      'msg',
+      '/tmp',
+      'main',
+      'docs/',
+      'context-data'
+    );
+    // $CONTEXT_FILE is not a context variable — should be left untouched
+    expect(prompt).toBe('Path: $CONTEXT_FILE');
+    expect(contextSubstituted).toBe(false);
+  });
+
   it('clears context variables when issueContext is undefined', () => {
     const { prompt, contextSubstituted } = substituteWorkflowVariables(
       'Context: $CONTEXT here',
@@ -278,5 +325,116 @@ describe('detectCreditExhaustion', () => {
 
   it('is case-insensitive', () => {
     expect(detectCreditExhaustion("YOU'RE OUT OF EXTRA USAGE")).not.toBeNull();
+  });
+});
+
+describe('isInlineScript', () => {
+  // Named identifiers — should return false
+  it('plain identifier is not inline', () => {
+    expect(isInlineScript('my-script')).toBe(false);
+  });
+
+  it('hyphenated name is not inline', () => {
+    expect(isInlineScript('fetch-data')).toBe(false);
+  });
+
+  it('dot-separated name is not inline', () => {
+    expect(isInlineScript('my.script')).toBe(false);
+  });
+
+  // Inline code — should return true
+  it('newline is inline', () => {
+    expect(isInlineScript('a\nb')).toBe(true);
+  });
+
+  it('semicolon is inline', () => {
+    expect(isInlineScript('a; b')).toBe(true);
+  });
+
+  it('parenthesis is inline', () => {
+    expect(isInlineScript('f()')).toBe(true);
+  });
+
+  it('space is inline', () => {
+    expect(isInlineScript('console.log("x")')).toBe(true);
+  });
+
+  it('dollar sign is inline', () => {
+    expect(isInlineScript('$VAR')).toBe(true);
+  });
+
+  it('single-quoted string is inline', () => {
+    expect(isInlineScript("print('hi')")).toBe(true);
+  });
+
+  it('double-quoted string is inline', () => {
+    expect(isInlineScript('print("hi")')).toBe(true);
+  });
+
+  // Edge cases
+  it('empty string is not inline', () => {
+    expect(isInlineScript('')).toBe(false);
+  });
+});
+
+describe('detectCompletionSignal', () => {
+  it('detects <promise>SIGNAL</promise> format', () => {
+    expect(detectCompletionSignal('<promise>COMPLETE</promise>', 'COMPLETE')).toBe(true);
+  });
+
+  it('detects signal in custom XML tags: <COMPLETE>SIGNAL</COMPLETE>', () => {
+    expect(detectCompletionSignal('<COMPLETE>ALL_CLEAN</COMPLETE>', 'ALL_CLEAN')).toBe(true);
+  });
+
+  it('detects signal in other XML tag names', () => {
+    expect(detectCompletionSignal('<done>COMPLETE</done>', 'COMPLETE')).toBe(true);
+    expect(detectCompletionSignal('<status>DONE</status>', 'DONE')).toBe(true);
+  });
+
+  it('detects plain signal at end of output', () => {
+    expect(detectCompletionSignal('Work done. COMPLETE', 'COMPLETE')).toBe(true);
+  });
+
+  it('detects plain signal on its own line', () => {
+    expect(detectCompletionSignal('Work done.\nCOMPLETE\nExtra text', 'COMPLETE')).toBe(true);
+  });
+
+  it('does not detect signal embedded in prose', () => {
+    expect(detectCompletionSignal('The status is not COMPLETE yet.', 'COMPLETE')).toBe(false);
+  });
+
+  it('does not detect signal when wrong value is in tags', () => {
+    expect(detectCompletionSignal('<COMPLETE>WRONG</COMPLETE>', 'ALL_CLEAN')).toBe(false);
+  });
+
+  it('does NOT detect signal when XML tag names do not match (strict)', () => {
+    // Open/close tag names must agree — guards against AI prose that
+    // interleaves tags (e.g. "<COMPLETE>ALL_CLEAN</other-tag>") being
+    // treated as a completion.
+    expect(detectCompletionSignal('<COMPLETE>ALL_CLEAN</done>', 'ALL_CLEAN')).toBe(false);
+  });
+
+  it('detects signal when tag names match case-insensitively', () => {
+    expect(detectCompletionSignal('<Complete>ALL_CLEAN</complete>', 'ALL_CLEAN')).toBe(true);
+  });
+});
+
+describe('stripCompletionTags', () => {
+  it('strips <promise> tags', () => {
+    expect(stripCompletionTags('Done. <promise>COMPLETE</promise>')).toBe('Done.');
+  });
+
+  it('strips XML-wrapped signal when until is provided', () => {
+    expect(stripCompletionTags('Done. <COMPLETE>ALL_CLEAN</COMPLETE>', 'ALL_CLEAN')).toBe('Done.');
+  });
+
+  it('does not strip XML tags when until is not provided', () => {
+    const input = 'Done. <COMPLETE>ALL_CLEAN</COMPLETE>';
+    expect(stripCompletionTags(input)).toBe(input.trim());
+  });
+
+  it('strips both <promise> and XML-tagged signal when until is provided', () => {
+    const input = 'Done. <promise>ALL_CLEAN</promise> <COMPLETE>ALL_CLEAN</COMPLETE>';
+    expect(stripCompletionTags(input, 'ALL_CLEAN')).toBe('Done.');
   });
 });
