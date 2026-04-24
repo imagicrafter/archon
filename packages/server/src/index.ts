@@ -257,6 +257,13 @@ export async function startServer(opts: ServerOptions = {}): Promise<void> {
   // accepting requests, so a snapshot taken at registration time would miss it.
   const activePlatforms: string[] = ['Web'];
 
+  // TELEGRAM_BOT_TOKEN_OVERRIDE lets a local instance disable (empty value) or swap
+  // the Telegram token without touching the shared token used by the remote deployment.
+  const telegramBotToken =
+    'TELEGRAM_BOT_TOKEN_OVERRIDE' in process.env
+      ? process.env.TELEGRAM_BOT_TOKEN_OVERRIDE
+      : process.env.TELEGRAM_BOT_TOKEN;
+
   // Platform adapters (skipped in CLI serve mode or when not configured)
   let github: GitHubAdapter | null = null;
   let gitea: GiteaAdapter | null = null;
@@ -266,7 +273,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<void> {
 
   if (!opts.skipPlatformAdapters) {
     // Check that at least one platform is configured
-    const hasTelegram = Boolean(process.env.TELEGRAM_BOT_TOKEN);
+    const hasTelegram = Boolean(telegramBotToken);
     const hasDiscord = Boolean(process.env.DISCORD_BOT_TOKEN);
     const hasGitHub = Boolean(process.env.GITHUB_TOKEN && process.env.WEBHOOK_SECRET);
     const hasGitea = Boolean(
@@ -598,9 +605,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<void> {
 
   // Initialize Telegram adapter (conditional, skipped in CLI serve mode)
   let telegram: TelegramAdapter | null = null;
-  if (!opts.skipPlatformAdapters && process.env.TELEGRAM_BOT_TOKEN) {
+  if (!opts.skipPlatformAdapters && telegramBotToken) {
     const streamingMode = (process.env.TELEGRAM_STREAMING_MODE ?? 'stream') as 'stream' | 'batch';
-    telegram = new TelegramAdapter(process.env.TELEGRAM_BOT_TOKEN, streamingMode);
+    telegram = new TelegramAdapter(telegramBotToken, streamingMode);
     const telegramAdapter = telegram; // Capture for use in callback
 
     // Register message handler (auth is handled internally by adapter)
