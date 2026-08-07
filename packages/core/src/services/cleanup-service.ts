@@ -15,6 +15,7 @@ import {
   getDefaultBranch,
   isBranchMerged,
   isPatchEquivalent,
+  resolveBranchRef,
   getLastCommitDate,
   toRepoPath,
   toWorktreePath,
@@ -37,10 +38,25 @@ function getLog(): ReturnType<typeof createLogger> {
 // .archon/config.yaml before falling back to runtime git detection. Repos
 // that use 'master' as default and don't have origin/HEAD set will fail
 // getDefaultBranch — reading the config first avoids that error.
+//
+// The configured name is resolved against the repo rather than trusted
+// verbatim: a repo cloned without ever checking the base branch out has
+// `origin/<branch>` but no local `<branch>`, and git will not resolve the bare
+// name to the remote-tracking ref. Left unresolved, every merge check against
+// it fails with "malformed object name" and cleanup silently stops reclaiming
+// that repo's branches. When it resolves nowhere we return the configured name
+// as-is; the merge check treats an unresolvable base as "cannot confirm" and
+// leaves branches alone, which is the safe direction.
 async function resolveBaseBranch(repoPath: RepoPath, cwd: string): Promise<BranchName> {
   const repoConfig = await loadRepoConfig(cwd);
   const configured = repoConfig.worktree?.baseBranch?.trim();
   if (configured) {
+    const resolved = await resolveBranchRef(repoPath, toBranchName(configured));
+    if (resolved) return resolved;
+    getLog().warn(
+      { repoPath, configured },
+      'base_branch_unresolved — cleanup will skip; fetch the repo or fix worktree.baseBranch'
+    );
     return toBranchName(configured);
   }
   return getDefaultBranch(repoPath);

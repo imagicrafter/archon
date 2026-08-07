@@ -13,6 +13,10 @@ const mockWorktreeExists = mock(() => Promise.resolve(false));
 const mockGetDefaultBranch = mock(() => Promise.resolve('main'));
 const mockIsBranchMerged = mock(() => Promise.resolve(false));
 const mockIsPatchEquivalent = mock(() => Promise.resolve(false));
+// Default: the configured base branch resolves as-is (a local branch exists).
+const mockResolveBranchRef = mock((_repo: string, branch: string) =>
+  Promise.resolve(branch as string | null)
+);
 const mockGetLastCommitDate = mock(() => Promise.resolve(null as Date | null));
 mock.module('@archon/git', () => ({
   execFileAsync: mockExecFileAsync,
@@ -21,6 +25,7 @@ mock.module('@archon/git', () => ({
   getDefaultBranch: mockGetDefaultBranch,
   isBranchMerged: mockIsBranchMerged,
   isPatchEquivalent: mockIsPatchEquivalent,
+  resolveBranchRef: mockResolveBranchRef,
   getLastCommitDate: mockGetLastCommitDate,
   toRepoPath: (p: string) => p,
   toBranchName: (b: string) => b,
@@ -1221,6 +1226,74 @@ describe('resolveBaseBranch via runScheduledCleanup (issue #1419)', () => {
     mockIsBranchMerged.mockResolvedValue(false);
     mockLoadRepoConfig.mockResolvedValue({});
     mockGetDefaultBranch.mockResolvedValue('main');
+    mockResolveBranchRef.mockImplementation((_repo: string, branch: string) =>
+      Promise.resolve(branch as string | null)
+    );
+  });
+
+  test('uses origin/<branch> when the configured base exists only as a remote ref', async () => {
+    mockListAllActiveWithCodebase.mockResolvedValueOnce([
+      {
+        id: 'env-remote-only',
+        codebase_id: 'codebase-1',
+        status: 'active',
+        branch_name: 'archon/thread-abc',
+        working_path: '/workspace/.archon/worktrees/thread-abc',
+        codebase_default_cwd: '/workspace/kwenv-fleetillo',
+        codebase_repository_url: null,
+        workflow_type: 'workflow',
+        workflow_id: 'wf-remote',
+        created_at: new Date(),
+        created_by_platform: null,
+        created_by_user_id: null,
+        metadata: {},
+        provider: 'worktree',
+      },
+    ]);
+    mockLoadRepoConfig.mockResolvedValueOnce({ worktree: { baseBranch: 'staging' } });
+    // The repo has origin/staging but no local staging — the production shape.
+    mockResolveBranchRef.mockResolvedValueOnce('origin/staging');
+
+    const report = await runScheduledCleanup();
+
+    // Without the fallback this passed a bare 'staging', which git rejects with
+    // "malformed object name" and cleanup errored once per env, per tick.
+    expect(mockIsBranchMerged).toHaveBeenCalledWith(
+      '/workspace/kwenv-fleetillo',
+      'archon/thread-abc',
+      'origin/staging'
+    );
+    expect(report.errors).toHaveLength(0);
+  });
+
+  test('an unresolvable base branch is reported, not thrown', async () => {
+    mockListAllActiveWithCodebase.mockResolvedValueOnce([
+      {
+        id: 'env-unresolvable',
+        codebase_id: 'codebase-1',
+        status: 'active',
+        branch_name: 'archon/thread-def',
+        working_path: '/workspace/.archon/worktrees/thread-def',
+        codebase_default_cwd: '/workspace/repo',
+        codebase_repository_url: null,
+        workflow_type: 'workflow',
+        workflow_id: 'wf-unresolvable',
+        created_at: new Date(),
+        created_by_platform: null,
+        created_by_user_id: null,
+        metadata: {},
+        provider: 'worktree',
+      },
+    ]);
+    mockLoadRepoConfig.mockResolvedValueOnce({ worktree: { baseBranch: 'gone' } });
+    mockResolveBranchRef.mockResolvedValueOnce(null);
+
+    const report = await runScheduledCleanup();
+
+    // Falls through with the configured name; isBranchMerged reports "cannot
+    // confirm" rather than throwing, so nothing is deleted and nothing errors.
+    expect(mockIsBranchMerged).toHaveBeenCalledWith('/workspace/repo', 'archon/thread-def', 'gone');
+    expect(report.errors).toHaveLength(0);
   });
 
   test('uses worktree.baseBranch from config and skips git detection for master-branch repo', async () => {
