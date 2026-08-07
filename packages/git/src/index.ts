@@ -42,6 +42,7 @@ export {
   isPatchEquivalent,
   isAncestorOf,
   getLastCommitDate,
+  resolveBranchRef,
 } from './branch';
 
 // Repository operations

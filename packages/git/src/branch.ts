@@ -177,6 +177,68 @@ export async function commitAllChanges(
 }
 
 /**
+ * Errors that mean "the ref or repo isn't there", as opposed to "git is broken".
+ *
+ * Git phrases a missing revision several different ways depending on which
+ * porcelain command rejected it — `unknown revision`, `bad revision`,
+ * `not a valid object name`, and `malformed object name` are all the same
+ * condition. Callers treat these as "cannot confirm", never as a hard failure,
+ * so a base branch that doesn't resolve leaves branches alone instead of
+ * throwing on every scheduled tick.
+ */
+function isMissingRefOrRepoError(err: Error & { code?: string; stderr?: string }): boolean {
+  const errorText = `${err.message} ${err.stderr ?? ''}`.toLowerCase();
+  return (
+    errorText.includes('not a git repository') ||
+    errorText.includes('unknown revision') ||
+    errorText.includes('bad revision') ||
+    errorText.includes('not a valid object name') ||
+    errorText.includes('malformed object name') ||
+    errorText.includes('no such file') ||
+    err.code === 'ENOENT'
+  );
+}
+
+/**
+ * Resolve a configured base-branch name to a ref git can actually use.
+ *
+ * A bare name like `staging` only resolves if it exists under refs/heads,
+ * refs/tags or refs/remotes/<name> — notably NOT refs/remotes/origin/<name>.
+ * A repo cloned without ever checking staging out therefore has `origin/staging`
+ * but no resolvable `staging`, and every `git branch --merged staging` fails.
+ *
+ * Prefers the local branch, then falls back to `origin/<branch>`. Returns null
+ * when the branch exists nowhere, so callers can skip rather than guess: the
+ * remote-tracking ref is the better fallback target anyway, since it refreshes
+ * on every fetch while a local branch nobody pulls goes stale and would
+ * under-report merges.
+ */
+export async function resolveBranchRef(
+  repoPath: RepoPath,
+  branchName: BranchName
+): Promise<BranchName | null> {
+  for (const candidate of [branchName, `origin/${branchName}`]) {
+    try {
+      await execFileAsync(
+        'git',
+        ['-C', repoPath, 'rev-parse', '--verify', '--quiet', `${candidate}^{commit}`],
+        { timeout: 10000 }
+      );
+      return toBranchName(candidate);
+    } catch (error) {
+      const err = error as Error & { code?: number | string; stderr?: string };
+      // `--verify --quiet` exits 1 with no output when the ref simply isn't there.
+      if (err.code === 1 || isMissingRefOrRepoError(err as Error & { code?: string })) {
+        continue;
+      }
+      getLog().error({ err: error, repoPath, branchName, candidate }, 'branch.resolve_ref_failed');
+      throw new Error(`Failed to resolve base branch ${branchName}: ${err.message}`);
+    }
+  }
+  return null;
+}
+
+/**
  * Check if a branch has been merged into main.
  *
  * Returns false for expected errors (branch/repo not found).
@@ -200,15 +262,8 @@ export async function isBranchMerged(
     return mergedBranches.includes(branchName);
   } catch (error) {
     const err = error as Error & { code?: string; stderr?: string };
-    const errorText = `${err.message} ${err.stderr ?? ''}`.toLowerCase();
 
-    const isExpectedError =
-      errorText.includes('not a git repository') ||
-      errorText.includes('unknown revision') ||
-      errorText.includes('no such file') ||
-      err.code === 'ENOENT';
-
-    if (isExpectedError) {
+    if (isMissingRefOrRepoError(err)) {
       return false;
     }
 
@@ -249,16 +304,8 @@ export async function isPatchEquivalent(
     return lines.every(line => line.startsWith('-'));
   } catch (error) {
     const err = error as Error & { code?: string; stderr?: string };
-    const errorText = `${err.message} ${err.stderr ?? ''}`.toLowerCase();
 
-    const isExpectedError =
-      errorText.includes('not a git repository') ||
-      errorText.includes('unknown revision') ||
-      errorText.includes('bad revision') ||
-      errorText.includes('no such file') ||
-      err.code === 'ENOENT';
-
-    if (isExpectedError) return false;
+    if (isMissingRefOrRepoError(err)) return false;
 
     getLog().error(
       { err: error, repoPath, branchName, baseBranch },
@@ -296,14 +343,7 @@ export async function isAncestorOf(
     const err = error as Error & { code?: number | string; stderr?: string };
     // exit code 1 = not an ancestor — expected case
     if (err.code === 1) return false;
-    const errorText = `${err.message} ${err.stderr ?? ''}`.toLowerCase();
-    const isExpectedError =
-      errorText.includes('not a git repository') ||
-      errorText.includes('unknown revision') ||
-      errorText.includes('not a valid object name') ||
-      errorText.includes('no such file') ||
-      err.code === 'ENOENT';
-    if (isExpectedError) return false;
+    if (isMissingRefOrRepoError(err as Error & { code?: string })) return false;
     getLog().error({ err: error, workingPath, ancestorRef }, 'branch.ancestor_check_failed');
     throw new Error(
       `Failed to check if ${ancestorRef} is ancestor of HEAD at ${workingPath}: ${(err as Error).message}`
